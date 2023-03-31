@@ -1,0 +1,193 @@
+<!-- Original tutorial from @anselm -->
+<!-- see the writeup at https://medium.com/@anselm/playing-with-gps-spatialized-web-audio-f86e45d31d10 -->
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Moving Sound</title>
+  <!-- CSS Sheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<canvas id="mycanvas" width=512 height=512>
+</canvas>
+
+
+<script>
+
+// a small database of all the objects
+let artifacts = [
+  { sound:"sounds/1.mp3", x:0, y:-20, z:0, color:"#00235B" },
+  { sound:"sounds/2.mp3", x:-0, y:20, z:0, color:"#E21818" },
+  { sound:"sounds/3.mp3", x:20, y:0, z:0, color:"#FFDD83" },
+  { sound:"sounds/4.mp3", x:-20, y:0, z:0, color:"#98DFD6" },
+];
+
+// the listener
+let listener = { x:0, y:0, z:0, rad:0 };
+
+// setup canvas
+let c = document.getElementById("mycanvas");
+let ctx = c.getContext("2d");
+
+// setup audio
+var AudioContext = window.AudioContext // Default
+    || window.webkitAudioContext // Safari and old versions of Chrome
+    || false; 
+
+if (!AudioContext) {
+    alert("Sorry, but web audio is not working");
+}
+
+let audioContext = new AudioContext;
+
+// helper to move listener - call this after listener values change
+function paintListener() {
+  audioContext.listener.setPosition(listener.x, listener.y, listener.z)
+  var v1 = Math.cos(listener.rad) // x
+  var v2 = 0             // y
+  var v3 = Math.sin(listener.rad) // z
+  var v4 = 0 // x
+  var v5 = 1 // y
+  var v6 = 0 // z
+  audioContext.listener.setOrientation(v1, v2, v3, v4, v5, v6)
+  ctx.fillStyle = "#0000ff";
+  let x = listener.x+512/2;
+  let y = listener.y+512/2;
+  ctx.fillRect(x,y,10,10);
+  ctx.arc(x,y,5,0,2*Math.PI);
+}
+
+function loadSound(obj) {
+  let soundname = obj.sound;
+  var loader = new XMLHttpRequest()
+  loader.open("GET", soundname );
+  loader.responseType = "arraybuffer"
+  loader.onload = function(event) {
+    var data = loader.response;
+    if (data === null) {
+      return;
+    }
+    audioContext.decodeAudioData(data, function(audioBuffer) {
+      obj.audioBuffer = audioBuffer;
+    });
+  }
+  loader.send()
+}
+
+// play an objects sound
+function playSound(obj) {
+  if(obj.isPlaying) return;
+  if(!obj.audioBuffer) {
+    if(!obj.loading) {
+      obj.loading = 1;
+      loadSound(obj);
+      console.log("loading sound " + obj.sound );
+    }
+    console.log("... still no sound yet");
+    return;
+  }
+  console.log("starting sound " + obj.sound );
+  obj.isPlaying = 1;
+  let source = obj.source;
+  if(!source) source = obj.source = audioContext.createBufferSource();
+  source.buffer = obj.audioBuffer;
+  if(!source.buffer) console.error("no buffer for " + obj.sound );
+
+  let panner = obj.panner;
+  if(!panner) {
+    panner = obj.panner = audioContext.createPanner()
+    panner.panningModel = "HRTF"
+  }
+  panner.setPosition(obj.x, obj.y, obj.z);
+ 
+  source.connect(panner)
+  panner.connect(audioContext.destination)
+
+  source.loop = true;
+  source.start();
+  console.log("starting sound " + obj.sound);
+}
+
+// helper to paint things
+function paintObjects() {
+  for(let i = 0; i < artifacts.length; i++) {
+    let obj = artifacts[i];
+    ctx.fillStyle = obj.color;
+    ctx.fillRect(obj.x+512/2,obj.y+512/2,10,10);
+    playSound(obj);
+  }
+}
+
+// clear the screen
+function clearScreen() {
+  ctx.fillStyle = "#00ff00";
+  ctx.fillRect(0,0,512,512);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(2,2,512-4,512-4);
+}
+
+function repaintAll() {
+  clearScreen();
+  paintListener();
+  paintObjects();
+}
+
+
+// keyboard controls
+document.onkeydown = checkKey;
+function checkKey(e) {
+  switch(e.key) {
+    case "ArrowUp": listener.y--; break;
+    case "ArrowDown": listener.y++; break;
+    case "ArrowLeft": listener.x--; break;
+    case "ArrowRight": listener.x++; break;
+  }
+  repaintAll();   
+}
+
+repaintAll();
+
+let pos = 0;
+
+function getLocation() {
+  console.log("starting geolocation");
+  navigator.geolocation.watchPosition(function(position) {
+    let lat = position.coords.latitude;
+    let lon = position.coords.longitude;
+    if(!pos) pos = { lat:lat, lon:lon };
+    listener.x = (lon-pos.lon)*100000;
+    listener.y = (lat-pos.lat)*100000;
+    console.log(lat + " " + lon );
+    repaintAll();
+  });
+}
+
+console.log("starting");
+getLocation();
+
+// - add orientation
+
+// magic wave dead chicken 
+// https://hackernoon.com/unlocking-web-audio-the-smarter-way-8858218c0e09
+
+let context = audioContext;
+if (context.state === 'suspended' && 'ontouchstart' in window)
+{
+    console.log("trying to unlock audio");
+    var unlock = function()
+    {
+	console.log("unlocked");
+        context.resume().then(function()
+        {
+            document.body.removeEventListener('touchstart', unlock);
+            document.body.removeEventListener('touchend', unlock);
+        });
+    };
+
+    document.body.addEventListener('touchstart', unlock, false);
+    document.body.addEventListener('touchend', unlock, false);
+} 
+
+</script>
