@@ -116,11 +116,12 @@ function playSound(obj) {
    navigator.geolocation.getCurrentPosition(position => {
     const userLat = position.coords.latitude;
     const userLng = position.coords.longitude;
-
     // Check if the user is within the threshold distance of the artifact
     const artifactLat = obj.x;
     const artifactLng = obj.y;
+    console.log(artifactLat + " " + artifactLng );
     const distance = haversine(userLat, userLng, artifactLat, artifactLng);
+    console.log(distance);
     if (distance <= threshold) {
       if(!obj.isPlaying) {
         obj.isPlaying = true;
