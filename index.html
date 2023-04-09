@@ -16,18 +16,21 @@
 <script>
 
 // create map
-let lat = 40.450;
-let lng = -79.950;
-let mymap = L.map('mapid').setView([lat, lng], 13);
+let lat = 40.442;
+let lng = -79.942;
 
-// add tile layer (using OpenStreetMap tiles)
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
-    maxZoom: 18,
-}).addTo(mymap);
+// convert lat/long to Web Audio API coordinates
+let xP = (lng + 180) / 360 * 512 - 256;
+let yP = ((lat * -1) + 90) / 180 * 512 - 256;
+let zP = 0;
+// a small database of all the objects
+let artifacts = [
+  { sound:"sounds/1.mp3", x:xP, y:yP, z:zP, color:"#00235B" },
+  // { sound:"sounds/2.mp3", x:-0, y:20, z:0, color:"#E21818" },
+  // { sound:"sounds/3.mp3", x:20, y:0, z:0, color:"#FFDD83" },
+  // { sound:"sounds/4.mp3", x:-20, y:0, z:0, color:"#98DFD6" },
+];
 
-// create marker at a specific lat/long
-let marker = L.marker([lat, lng]).addTo(mymap);
 // convert lat/long to Web Audio API coordinates
 let xP = (lng + 180) / 360 * 512 - 256;
 let yP = ((lat * -1) + 90) / 180 * 512 - 256;
