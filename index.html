@@ -123,8 +123,7 @@ function playSound(obj) {
     const artifactLat = obj.x;
     const artifactLng = obj.y;
     console.log("playsound" + artifactLat + " " + artifactLng );
-    // const distance = haversine(userLat, userLng, artifactLat, artifactLng);
-    const distance = 5;
+    const distance = haversine(userLat, userLng, artifactLat, artifactLng);
     console.log(distance);
     if (distance <= threshold) {
       if(!obj.isPlaying) {
