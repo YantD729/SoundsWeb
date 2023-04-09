@@ -103,7 +103,6 @@ function loadSound(obj) {
 
 // play an objects sound
 function playSound(obj) {
-  if(obj.isPlaying) return;
   if(!obj.audioBuffer) {
     if(!obj.loading) {
       obj.loading = 1;
@@ -124,7 +123,6 @@ function playSound(obj) {
     const distance = haversine(userLat, userLng, artifactLat, artifactLng);
     if (distance <= threshold) {
       if(!obj.isPlaying) {
-        console.log("starting sound " + obj.sound);
         obj.isPlaying = true;
         let source = obj.source;
         if(!source) source = obj.source = audioContext.createBufferSource();
@@ -222,7 +220,7 @@ if (context.state === 'suspended' && 'ontouchstart' in window)
     console.log("trying to unlock audio");
     var unlock = function()
     {
-	console.log("unlocked");
+	      console.log("unlocked");
         context.resume().then(function()
         {
             document.body.removeEventListener('touchstart', unlock);
