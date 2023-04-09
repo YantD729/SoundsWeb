@@ -236,6 +236,7 @@ window.addEventListener('load', init, false);
 function init() {
     try {
     context = new AudioContext();
+    console.log("init");
     }
     catch(e) {
     alert('Web Audio API is not supported in this browser');
