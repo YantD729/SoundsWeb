@@ -18,8 +18,8 @@
 <script>
 
 // create map
-let lat = 40.442057;
-let lng = -79.941607;
+let lat = 40.44255;
+let lng = -79.94147;
 
 // Define the distance threshold in meters
 const threshold = 10;
@@ -219,21 +219,7 @@ getLocation();
 // https://hackernoon.com/unlocking-web-audio-the-smarter-way-8858218c0e09
 
 let context = audioContext;
-// if (context.state === 'suspended' && 'ontouchstart' in window)
-// {
-//     console.log("trying to unlock audio");
-//     var unlock = function()
-//     {
-// 	      console.log("unlocked");
-//         context.resume().then(function()
-//         {
-//             document.body.removeEventListener('touchstart', unlock);
-//             document.body.removeEventListener('touchend', unlock);
-//         });
-//     };
-//     document.body.addEventListener('touchstart', unlock, false);
-//     document.body.addEventListener('touchend', unlock, false);
-// } 
+
 function resumeAudio() {
   context.resume().then(() => {
     console.log('Playback resumed successfully');
