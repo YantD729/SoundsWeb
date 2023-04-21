@@ -22,6 +22,73 @@
 
 <script>
 
+// Initialize the Google Drive API client
+var CLIENT_ID = 'YOUR_CLIENT_ID';
+var API_KEY = 'YOUR_API_KEY';
+var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+var SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+gapi.load('client:auth2', initClient);
+
+function initClient() {
+  gapi.client.init({
+    apiKey: API_KEY,
+    clientId: CLIENT_ID,
+    discoveryDocs: DISCOVERY_DOCS,
+    scope: SCOPES
+  }).then(function () {
+    // Listen for the form submission event
+    var form = document.getElementById('uploadForm');
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+      var file = document.getElementById('audioFile').files[0];
+      uploadFile(file);
+    });
+  });
+}
+
+function uploadFile(file) {
+  var metadata = {
+    name: file.name,
+    mimeType: file.type
+  };
+  var reader = new FileReader();
+  reader.readAsArrayBuffer(file);
+  reader.onloadend = function() {
+    var data = reader.result;
+    var requestData = new Uint8Array(data);
+    var boundary = '-------' + (new Date()).getTime();
+    var delimiter = "\r\n--" + boundary + "\r\n";
+    var close_delim = "\r\n--" + boundary + "--";
+    var multipartRequestBody =
+      delimiter +
+      'Content-Type: application/json\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: ' + file.type + '\r\n' +
+      '\r\n' +
+      requestData + '\r\n' +
+      close_delim;
+    var request = gapi.client.request({
+      'path': '/upload/drive/v3/files',
+      'method': 'POST',
+      'params': {'uploadType': 'multipart'},
+      'headers': {
+        'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+      },
+      'body': multipartRequestBody
+    });
+    request.execute(function(response) {
+      // The file has been uploaded, and you can now use the file ID in your Google Maps implementation
+      var fileId = response.id;
+      var fileUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
+      console.log('File uploaded to Google Drive with ID: ' + fileId);
+      console.log('File URL: ' + fileUrl);
+    });
+  };
+}
+
+
 // create map
 let lat = 40.44255;
 let lng = -79.94147;
