@@ -10,292 +10,238 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 
-<canvas id="mycanvas" width=512 height=512>
-</canvas>
-
-<button onclick="resumeAudio()">Open Audio</button>
-
-<form id="uploadForm">
-  <input type="file" id="audioFile" name="audioFile">
-  <button type="submit">Upload</button>
-</form>
-
-<script>
-
-// Initialize the Google Drive API client
-var CLIENT_ID = 'YOUR_CLIENT_ID';
-var API_KEY = 'YOUR_API_KEY';
-var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
-var SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
-gapi.load('client:auth2', initClient);
-
-function initClient() {
-  gapi.client.init({
-    apiKey: API_KEY,
-    clientId: CLIENT_ID,
-    discoveryDocs: DISCOVERY_DOCS,
-    scope: SCOPES
-  }).then(function () {
-    // Listen for the form submission event
-    var form = document.getElementById('uploadForm');
-    form.addEventListener('submit', function(event) {
-      event.preventDefault();
-      var file = document.getElementById('audioFile').files[0];
-      uploadFile(file);
-    });
+<body>
+  <canvas id="mycanvas" width=512 height=512>
+  </canvas>
+  
+  <button onclick="resumeAudio()">Open Audio</button>
+  
+  <form id="uploadForm">
+    <input type="file" id="audioFile" name="audioFile">
+    <button type="submit">Upload</button>
+  </form>
+  
+  <h1>Sound Upload</h1>
+      <form enctype="multipart/form-data" method="POST" action="/upload">
+          <input type="file" name="sound_file"><br>
+          <label for="sound_name">Sound Name:</label>
+          <input type="text" name="sound_name"><br>
+          <label for="sound_description">Sound Description:</label>
+          <textarea name="sound_description"></textarea><br>
+          <input type="submit" value="Upload">
+      </form>
+  
+  
+  <script>
+  
+  // create map
+  let lat = 40.44255;
+  let lng = -79.94147;
+  
+  // Define the distance threshold in meters
+  const threshold = 10;
+  
+  // a small database of all the objects
+  let artifacts = [
+    { sound:"sounds/1.mp3", x:lat, y:lng, z:0, color:"#00235B" },
+    // { sound:"sounds/2.mp3", x:-0, y:20, z:0, color:"#E21818" },
+    // { sound:"sounds/3.mp3", x:20, y:0, z:0, color:"#FFDD83" },
+    // { sound:"sounds/4.mp3", x:-20, y:0, z:0, color:"#98DFD6" },
+  ];
+  
+  // the listener
+  let listener = { x:0, y:0, z:0, rad:0 };
+  navigator.geolocation.getCurrentPosition(position => {
+    listener.x = position.coords.longitude;
+    listener.y = position.coords.latitude;
+    listener.z = position.coords.altitude || 0;
   });
-}
-
-function uploadFile(file) {
-  var metadata = {
-    name: file.name,
-    mimeType: file.type
-  };
-  var reader = new FileReader();
-  reader.readAsArrayBuffer(file);
-  reader.onloadend = function() {
-    var data = reader.result;
-    var requestData = new Uint8Array(data);
-    var boundary = '-------' + (new Date()).getTime();
-    var delimiter = "\r\n--" + boundary + "\r\n";
-    var close_delim = "\r\n--" + boundary + "--";
-    var multipartRequestBody =
-      delimiter +
-      'Content-Type: application/json\r\n\r\n' +
-      JSON.stringify(metadata) +
-      delimiter +
-      'Content-Type: ' + file.type + '\r\n' +
-      '\r\n' +
-      requestData + '\r\n' +
-      close_delim;
-    var request = gapi.client.request({
-      'path': '/upload/drive/v3/files',
-      'method': 'POST',
-      'params': {'uploadType': 'multipart'},
-      'headers': {
-        'Content-Type': 'multipart/related; boundary="' + boundary + '"'
-      },
-      'body': multipartRequestBody
-    });
-    request.execute(function(response) {
-      // The file has been uploaded, and you can now use the file ID in your Google Maps implementation
-      var fileId = response.id;
-      var fileUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
-      console.log('File uploaded to Google Drive with ID: ' + fileId);
-      console.log('File URL: ' + fileUrl);
-    });
-  };
-}
-
-
-// create map
-let lat = 40.44255;
-let lng = -79.94147;
-
-// Define the distance threshold in meters
-const threshold = 10;
-
-// a small database of all the objects
-let artifacts = [
-  { sound:"sounds/1.mp3", x:lat, y:lng, z:0, color:"#00235B" },
-  // { sound:"sounds/2.mp3", x:-0, y:20, z:0, color:"#E21818" },
-  // { sound:"sounds/3.mp3", x:20, y:0, z:0, color:"#FFDD83" },
-  // { sound:"sounds/4.mp3", x:-20, y:0, z:0, color:"#98DFD6" },
-];
-
-// the listener
-let listener = { x:0, y:0, z:0, rad:0 };
-navigator.geolocation.getCurrentPosition(position => {
-  listener.x = position.coords.longitude;
-  listener.y = position.coords.latitude;
-  listener.z = position.coords.altitude || 0;
-});
-
-// setup canvas
-let c = document.getElementById("mycanvas");
-let ctx = c.getContext("2d");
-
-// setup audio
-var AudioContext = window.AudioContext // Default
-    || window.webkitAudioContext // Safari and old versions of Chrome
-    || false; 
-
-if (!AudioContext) {
-    alert("Sorry, but web audio is not working");
-}
-
-let audioContext = new AudioContext;
-
-// Haversine formula for calculating distance between two points
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371e3; // earth radius in meters
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const d = R * c;
-  return d;
-}
-
-// helper to move listener - call this after listener values change
-function paintListener() {
-  audioContext.listener.setPosition(listener.x, listener.y, listener.z)
-  var v1 = Math.cos(listener.rad) // x
-  var v2 = 0             // y
-  var v3 = Math.sin(listener.rad) // z
-  var v4 = 0 // x
-  var v5 = 1 // y
-  var v6 = 0 // z
-  audioContext.listener.setOrientation(v1, v2, v3, v4, v5, v6)
-  ctx.fillStyle = "#0000ff";
-  let x = listener.x+512/2;
-  let y = listener.y+512/2;
-  ctx.fillRect(x,y,10,10);
-  ctx.arc(x,y,5,0,2*Math.PI);
-}
-
-function loadSound(obj) {
-  let soundname = obj.sound;
-  var loader = new XMLHttpRequest()
-  loader.open("GET", soundname );
-  loader.responseType = "arraybuffer"
-  loader.onload = function(event) {
-    var data = loader.response;
-    if (data === null) {
+  
+  // setup canvas
+  let c = document.getElementById("mycanvas");
+  let ctx = c.getContext("2d");
+  
+  // setup audio
+  var AudioContext = window.AudioContext // Default
+      || window.webkitAudioContext // Safari and old versions of Chrome
+      || false; 
+  
+  if (!AudioContext) {
+      alert("Sorry, but web audio is not working");
+  }
+  
+  let audioContext = new AudioContext;
+  
+  // Haversine formula for calculating distance between two points
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371e3; // earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const d = R * c;
+    return d;
+  }
+  
+  // helper to move listener - call this after listener values change
+  function paintListener() {
+    audioContext.listener.setPosition(listener.x, listener.y, listener.z)
+    var v1 = Math.cos(listener.rad) // x
+    var v2 = 0             // y
+    var v3 = Math.sin(listener.rad) // z
+    var v4 = 0 // x
+    var v5 = 1 // y
+    var v6 = 0 // z
+    audioContext.listener.setOrientation(v1, v2, v3, v4, v5, v6)
+    ctx.fillStyle = "#0000ff";
+    let x = listener.x+512/2;
+    let y = listener.y+512/2;
+    ctx.fillRect(x,y,10,10);
+    ctx.arc(x,y,5,0,2*Math.PI);
+  }
+  
+  function loadSound(obj) {
+    let soundname = obj.sound;
+    var loader = new XMLHttpRequest()
+    loader.open("GET", soundname );
+    loader.responseType = "arraybuffer"
+    loader.onload = function(event) {
+      var data = loader.response;
+      if (data === null) {
+        return;
+      }
+      audioContext.decodeAudioData(data, function(audioBuffer) {
+        obj.audioBuffer = audioBuffer;
+      });
+    }
+    loader.send()
+  }
+  
+  // play an objects sound
+  function playSound(obj) {
+    if(!obj.audioBuffer) {
+      if(!obj.loading) {
+        obj.loading = 1;
+        loadSound(obj);
+        console.log("loading sound " + obj.sound );
+      }
+      console.log("... still no sound yet");
       return;
     }
-    audioContext.decodeAudioData(data, function(audioBuffer) {
-      obj.audioBuffer = audioBuffer;
+     // Get the user's current location
+     navigator.geolocation.getCurrentPosition(position => {
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+      // Check if the user is within the threshold distance of the artifact
+      const artifactLat = obj.x;
+      const artifactLng = obj.y;
+      console.log("playsound" + artifactLat + " " + artifactLng );
+      const distance = haversine(userLat, userLng, artifactLat, artifactLng);
+      console.log(distance);
+      if (distance <= threshold) {
+        if(!obj.isPlaying) {
+          obj.isPlaying = true;
+          let source = obj.source;
+          if(!source) source = obj.source = audioContext.createBufferSource();
+          source.buffer = obj.audioBuffer;
+          if(!source.buffer) console.error("no buffer for " + obj.sound );
+  
+          let panner = obj.panner;
+          if(!panner) {
+            panner = obj.panner = audioContext.createPanner()
+            panner.panningModel = "HRTF"
+          }
+          panner.setPosition(obj.x, obj.y, obj.z);
+  
+          source.connect(panner)
+          panner.connect(audioContext.destination)
+  
+          source.loop = true;
+          source.start();
+          console.log("starting sound " + obj.sound);
+        }
+      } else {
+        if(obj.isPlaying) {
+          console.log("stopping sound " + obj.sound);
+          obj.isPlaying = false;
+          obj.source.stop();
+        }
+      }
     });
   }
-  loader.send()
-}
-
-// play an objects sound
-function playSound(obj) {
-  if(!obj.audioBuffer) {
-    if(!obj.loading) {
-      obj.loading = 1;
-      loadSound(obj);
-      console.log("loading sound " + obj.sound );
+  
+  // helper to paint things
+  function paintObjects() {
+    for(let i = 0; i < artifacts.length; i++) {
+      let obj = artifacts[i];
+      ctx.fillStyle = obj.color;
+      ctx.fillRect(obj.x*0.1+512/2,obj.y*0.1+512/2,10,10);
+      playSound(obj);
     }
-    console.log("... still no sound yet");
-    return;
   }
-   // Get the user's current location
-   navigator.geolocation.getCurrentPosition(position => {
-    const userLat = position.coords.latitude;
-    const userLng = position.coords.longitude;
-    // Check if the user is within the threshold distance of the artifact
-    const artifactLat = obj.x;
-    const artifactLng = obj.y;
-    console.log("playsound" + artifactLat + " " + artifactLng );
-    const distance = haversine(userLat, userLng, artifactLat, artifactLng);
-    console.log(distance);
-    if (distance <= threshold) {
-      if(!obj.isPlaying) {
-        obj.isPlaying = true;
-        let source = obj.source;
-        if(!source) source = obj.source = audioContext.createBufferSource();
-        source.buffer = obj.audioBuffer;
-        if(!source.buffer) console.error("no buffer for " + obj.sound );
-
-        let panner = obj.panner;
-        if(!panner) {
-          panner = obj.panner = audioContext.createPanner()
-          panner.panningModel = "HRTF"
-        }
-        panner.setPosition(obj.x, obj.y, obj.z);
-
-        source.connect(panner)
-        panner.connect(audioContext.destination)
-
-        source.loop = true;
-        source.start();
-        console.log("starting sound " + obj.sound);
-      }
-    } else {
-      if(obj.isPlaying) {
-        console.log("stopping sound " + obj.sound);
-        obj.isPlaying = false;
-        obj.source.stop();
-      }
+  
+  // clear the screen
+  function clearScreen() {
+    ctx.fillStyle = "#00ff00";
+    ctx.fillRect(0,0,512,512);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(2,2,512-4,512-4);
+  }
+  
+  function repaintAll() {
+    clearScreen();
+    paintListener();
+    paintObjects();
+  }
+  
+  // keyboard controls
+  document.onkeydown = checkKey;
+  function checkKey(e) {
+    switch(e.key) {
+      case "ArrowUp": listener.y--; break;
+      case "ArrowDown": listener.y++; break;
+      case "ArrowLeft": listener.x--; break;
+      case "ArrowRight": listener.x++; break;
     }
-  });
-}
-
-// helper to paint things
-function paintObjects() {
-  for(let i = 0; i < artifacts.length; i++) {
-    let obj = artifacts[i];
-    ctx.fillStyle = obj.color;
-    ctx.fillRect(obj.x*0.1+512/2,obj.y*0.1+512/2,10,10);
-    playSound(obj);
+    repaintAll();   
   }
-}
-
-// clear the screen
-function clearScreen() {
-  ctx.fillStyle = "#00ff00";
-  ctx.fillRect(0,0,512,512);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(2,2,512-4,512-4);
-}
-
-function repaintAll() {
-  clearScreen();
-  paintListener();
-  paintObjects();
-}
-
-// keyboard controls
-document.onkeydown = checkKey;
-function checkKey(e) {
-  switch(e.key) {
-    case "ArrowUp": listener.y--; break;
-    case "ArrowDown": listener.y++; break;
-    case "ArrowLeft": listener.x--; break;
-    case "ArrowRight": listener.x++; break;
+  
+  repaintAll();
+  
+  let pos = 0;
+  
+  function getLocation() {
+    console.log("starting geolocation");
+    navigator.geolocation.watchPosition(function(position) {
+      let lat = position.coords.latitude;
+      let lon = position.coords.longitude;
+      if(!pos) pos = { lat:lat, lon:lon };
+      listener.x = (lon-pos.lon)*100000;
+      listener.y = (lat-pos.lat)*100000;
+      console.log(lat + " " + lon );
+      repaintAll();
+    });
   }
-  repaintAll();   
-}
-
-repaintAll();
-
-let pos = 0;
-
-function getLocation() {
-  console.log("starting geolocation");
-  navigator.geolocation.watchPosition(function(position) {
-    let lat = position.coords.latitude;
-    let lon = position.coords.longitude;
-    if(!pos) pos = { lat:lat, lon:lon };
-    listener.x = (lon-pos.lon)*100000;
-    listener.y = (lat-pos.lat)*100000;
-    console.log(lat + " " + lon );
-    repaintAll();
-  });
-}
-
-console.log("starting");
-getLocation();
-
-// - add orientation
-
-// magic wave dead chicken 
-// https://hackernoon.com/unlocking-web-audio-the-smarter-way-8858218c0e09
-
-let context = audioContext;
-
-function resumeAudio() {
-  context.resume().then(() => {
-    console.log('Playback resumed successfully');
-  });
-}
-
-</script>
+  
+  console.log("starting");
+  getLocation();
+  
+  // - add orientation
+  
+  // magic wave dead chicken 
+  // https://hackernoon.com/unlocking-web-audio-the-smarter-way-8858218c0e09
+  
+  let context = audioContext;
+  
+  function resumeAudio() {
+    context.resume().then(() => {
+      console.log('Playback resumed successfully');
+    });
+  }
+  
+  </script>
+</body>
