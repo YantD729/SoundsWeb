@@ -16,22 +16,20 @@
   
   <button onclick="resumeAudio()">Open Audio</button>
   
-  <form id="uploadForm">
+  <!-- <form id="uploadForm">
     <input type="file" id="audioFile" name="audioFile">
     <button type="submit">Upload</button>
-  </form>
+  </form> -->
   
   <h1>Sound Upload</h1>
-      <form enctype="multipart/form-data" method="POST" action="/upload">
-          <input type="file" name="sound_file"><br>
-          <label for="sound_name">Sound Name:</label>
-          <input type="text" name="sound_name"><br>
-          <label for="sound_description">Sound Description:</label>
-          <textarea name="sound_description"></textarea><br>
-          <input type="submit" value="Upload">
-      </form>
-  
-  
+    <form enctype="multipart/form-data" method="POST" action="/upload" id="uploadForm">
+      <input type="file" name="sound_file" id="sound_file"><br>
+      <label for="latitude">Latitude:</label>
+      <input type="text" name="latitude" id="latitude"><br>
+      <label for="longitude">Longitude:</label>
+      <input type="text" name="longitude" id="longitude"><br>
+      <input type="submit" value="Upload">
+    </form>
   <script>
   
   // create map
@@ -40,14 +38,6 @@
   
   // Define the distance threshold in meters
   const threshold = 10;
-  
-  // a small database of all the objects
-  let artifacts = [
-    { sound:"sounds/1.mp3", x:lat, y:lng, z:0, color:"#00235B" },
-    // { sound:"sounds/2.mp3", x:-0, y:20, z:0, color:"#E21818" },
-    // { sound:"sounds/3.mp3", x:20, y:0, z:0, color:"#FFDD83" },
-    // { sound:"sounds/4.mp3", x:-20, y:0, z:0, color:"#98DFD6" },
-  ];
   
   // the listener
   let listener = { x:0, y:0, z:0, rad:0 };
@@ -71,21 +61,6 @@
   }
   
   let audioContext = new AudioContext;
-  
-  // Haversine formula for calculating distance between two points
-  function haversine(lat1, lng1, lat2, lng2) {
-    const R = 6371e3; // earth radius in meters
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const d = R * c;
-    return d;
-  }
   
   // helper to move listener - call this after listener values change
   function paintListener() {
@@ -121,69 +96,129 @@
     loader.send()
   }
   
-  // play an objects sound
-  function playSound(obj) {
-    if(!obj.audioBuffer) {
-      if(!obj.loading) {
-        obj.loading = 1;
-        loadSound(obj);
-        console.log("loading sound " + obj.sound );
+  function playSound(location) {
+    // 构建请求数据
+    var requestData = { location: location };
+
+    // 发送POST请求到后端获取音频文件URL
+    fetch('/play', {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+      headers: {
+        'Content-Type': 'application/json'
       }
-      console.log("... still no sound yet");
-      return;
-    }
-     // Get the user's current location
-     navigator.geolocation.getCurrentPosition(position => {
-      const userLat = position.coords.latitude;
-      const userLng = position.coords.longitude;
-      // Check if the user is within the threshold distance of the artifact
-      const artifactLat = obj.x;
-      const artifactLng = obj.y;
-      console.log("playsound" + artifactLat + " " + artifactLng );
-      const distance = haversine(userLat, userLng, artifactLat, artifactLng);
-      console.log(distance);
-      if (distance <= threshold) {
-        if(!obj.isPlaying) {
-          obj.isPlaying = true;
-          let source = obj.source;
-          if(!source) source = obj.source = audioContext.createBufferSource();
-          source.buffer = obj.audioBuffer;
-          if(!source.buffer) console.error("no buffer for " + obj.sound );
-  
-          let panner = obj.panner;
-          if(!panner) {
-            panner = obj.panner = audioContext.createPanner()
-            panner.panningModel = "HRTF"
-          }
-          panner.setPosition(obj.x, obj.y, obj.z);
-  
-          source.connect(panner)
-          panner.connect(audioContext.destination)
-  
-          source.loop = true;
-          source.start();
-          console.log("starting sound " + obj.sound);
-        }
-      } else {
-        if(obj.isPlaying) {
-          console.log("stopping sound " + obj.sound);
-          obj.isPlaying = false;
-          obj.source.stop();
-        }
-      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      // 创建 Audio 对象
+      var audio = new Audio(data.file);
+
+      // 在控制台中输出音频信息
+      var soundInfo = "Audio File: " + audio.src + "<br>"
+                    + "Audio Type: " + audio.type + "<br>"
+                    + "Audio Duration: " + audio.duration + " seconds";
+      document.getElementById("sound-info").innerHTML = soundInfo;
+
+      // 播放音频
+      audio.play();
+    })
+    .catch(error => {
+      console.error('Error:', error);
     });
   }
-  
-  // helper to paint things
-  function paintObjects() {
-    for(let i = 0; i < artifacts.length; i++) {
-      let obj = artifacts[i];
-      ctx.fillStyle = obj.color;
-      ctx.fillRect(obj.x*0.1+512/2,obj.y*0.1+512/2,10,10);
-      playSound(obj);
-    }
+
+  function uploadSound(event) {
+    event.preventDefault();
+    let fileInput = document.getElementById('sound_file');
+    let file = fileInput.files[0];
+    let latitudeInput = document.getElementById('latitude');
+    let latitude = latitudeInput.value;
+    let longitudeInput = document.getElementById('longitude');
+    let longitude = longitudeInput.value;
+
+    let formData = new FormData();
+    formData.append('sound_file', file);
+    formData.append('latitude', latitude);
+    formData.append('longitude', longitude);
+
+    fetch('/upload', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => {
+      if (response.ok) {
+        console.log('Sound uploaded successfully!');
+      } else {
+        console.error('Error uploading sound:', response.statusText);
+      }
+    })
+    .catch(error => {
+      console.error('Error uploading sound:', error);
+    });
   }
-  
+
+  let uploadForm = document.getElementById('uploadForm');
+  uploadForm.addEventListener('submit', uploadSound);
+
+
+  function getSoundFile(userLocation) {
+    // 创建一个 XMLHttpRequest 对象
+    let xhr = new XMLHttpRequest();
+
+    // 设置请求地址
+    let url = 'http://localhost:5500/play';
+
+    // 设置请求方法
+    xhr.open('POST', url, true);
+
+    // 设置请求头
+    xhr.setRequestHeader('Content-type', 'application/json');
+
+    // 设置请求参数
+    let data = JSON.stringify({ location: userLocation });
+    
+    // 处理请求响应
+    xhr.onreadystatechange = function() {
+      if(xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+        let response = JSON.parse(xhr.responseText);
+        let soundFile = response.file;
+        playSound(soundFile);
+      }
+    };
+
+    // 发送请求
+    xhr.send(data);
+  }
+
+  function paintObjects() {
+  // 获取所有声音的位置信息
+  getSoundLocations().then(locations => {
+    // 绘制所有声音点
+    console.log('Sound locations:', data.locations);
+    drawSoundPoints(locations);
+  });
+}
+
+function getSoundLocations() {
+  // 使用 AJAX 请求从后端获取所有声音的位置信息
+  return fetch('http://localhost:5500/locations')
+    .then(response => {
+      console.log('Sound locations:', response);
+      response.json();
+    })
+    .then(data => {
+      return data.locations;
+    });
+}
+
+function drawSoundPoints(locations) {
+  for (let i = 0; i < locations.length; i++) {
+    let loc = locations[i];
+    ctx.fillStyle = 'red';
+    ctx.fillRect(loc.x*0.1+512/2,loc.y*0.1+512/2,10,10);
+  }
+}
+
   // clear the screen
   function clearScreen() {
     ctx.fillStyle = "#00ff00";
@@ -229,6 +264,23 @@
   
   console.log("starting");
   getLocation();
+
+  const form = document.querySelector('form');
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload');
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    alert('Upload successful');
+                } else {
+                    alert('Upload failed');
+                }
+            };
+            xhr.send(new FormData(form));
+        });
   
   // - add orientation
   
